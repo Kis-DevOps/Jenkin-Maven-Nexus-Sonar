@@ -1,0 +1,36 @@
+pipeline{
+  agent any
+
+    stages{
+     stage("Git Checkout"){
+      steps{
+            checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/kliakos/sparkjava-war-example.git']]])
+           }
+          }
+	 stage("Build Project"){
+	  steps{
+	   sh 'mvn package -DskipTest' 
+	  }
+	}
+	 stage("SonarQube analysis"){
+	  steps{
+	   withSonarQubeEnv(credentialsId: 'SonarqubeToken') {
+        sh 'mvn clean package sonar:sonar'
+        }
+	  }
+	}
+	 stage("Artifactory Deploy"){
+	   steps{
+	    nexusArtifactUploader credentialsId: 'NexusID', groupId: 'KisDevops2', nexusUrl: '192.168.42.131:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'Java-Maven-Apps', version: '$BUILD_NUMBER'
+	  }
+	}
+	
+	 stage("SonarQube Qualitygates"){
+	  steps{
+	   waitForQualityGate abortPipeline: false, credentialsId: 'SonarqubeToken'
+	  }
+	}
+	
+  }
+
+}
